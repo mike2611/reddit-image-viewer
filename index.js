@@ -39,16 +39,65 @@ function getSubImages(sub) {
 }
 
 // ---------------------- INSERT CODE  HERE ---------------------------
+
+const sub$ = 
+  Observable.concat(
+    Observable.of(subSelect.value),
+    Observable.fromEvent(subSelect, 'change').
+    map((event) => event.target.value)  
+  )
+ 
+const next$ = Observable.fromEvent(nextButton, 'click');
+
+const back$ = Observable.fromEvent(backButton, 'click');
+
+const offset$ = 
+    Observable.merge(
+      next$.map(() => 1),
+      back$.map(() => -1)
+    )
+
+const indices = 
+      Observable.concat(
+        Observable.of(0),
+        offset$.scan((acc, curr) => acc + curr, 0)
+      )
+
+
+// Preload image
+// const img = new Image(src);
+// img.onload = function() {
+// }
+// img.onerror = function() {
+// }
+
+//Preload image observable
+function preloadImage(src) {
+  const img = new Image(src);
+  const success$ = 
+    Observable.fromEvent(img , 'load').
+    map(() => src);
+  const failure$ = 
+    Observable.fromEvent(img , 'error').
+    map(() => LOADING_ERROR_URL);
+
+  return Observable.merge(success$, failure$);
+}           
+
 // This "images" Observable is a dummy. Replace it with a stream of each
 // image in the current sub which is navigated by the user.
-const images = Observable.of("https://upload.wikimedia.org/wikipedia/commons/3/36/Hopetoun_falls.jpg");
+const image$ = 
+    sub$.map((sub) => 
+      getSubImages(sub).
+        map(images => indices.map(index => images[index]))).
+        switch().
+        map((url) => preloadImage(url)).
+        switch().
+      switch();
 
 images.subscribe({
   next(url) {
-    // hide the loading image
     loading.style.visibility = "hidden";
-
-    // set Image source to URL
     img.src = url;
   },
   error(e) {
@@ -56,9 +105,5 @@ images.subscribe({
   }
 })
 
-// This "actions" Observable is a placeholder. Replace it with an
-// observable that notfies whenever a user performs an action,
-// like changing the sub or navigating the images
-const actions = Observable.empty();
-
+const actions = Observable.merge(sub$, next$, back$);
 actions.subscribe(() => loading.style.visibility = "visible");
